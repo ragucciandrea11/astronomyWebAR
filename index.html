@@ -3,100 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WebAR Celestial Simulator - Finale</title>
+    <title>Celestial AR - Allineamento Perfetto</title>
     
     <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Courier New', Courier, monospace; }
+        body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: black; }
         
+        /* Schermata di Benvenuto */
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); color: #00ff88; z-index: 9999;
+            background: rgba(0,0,0,0.95); color: white; z-index: 9999;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             text-align: center; padding: 20px; box-sizing: border-box;
         }
 
         #start-btn {
-            padding: 20px 40px; font-size: 20px; background: #00ff88; color: black;
-            border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-top: 30px;
+            padding: 20px 40px; font-size: 22px; background: #00ff88; color: black;
+            border: none; border-radius: 50px; cursor: pointer; font-weight: bold; margin-top: 20px;
+            box-shadow: 0 0 15px #00ff88;
         }
 
-        #hud {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            width: 90%; background: rgba(0, 0, 0, 0.8); border: 1px solid #00ff88;
-            border-radius: 10px; color: white; z-index: 1000; padding: 15px; box-sizing: border-box;
+        /* Controlli di Calibrazione */
+        #controls {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 85%; background: rgba(0,0,0,0.85); padding: 15px;
+            border-radius: 15px; color: white; z-index: 10; text-align: center;
+            border: 1px solid #00ff88;
         }
 
-        .hud-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-        .hud-value { font-weight: bold; color: #00ff88; }
-        input[type=range] { width: 100%; margin-top: 10px; accent-color: #00ff88; }
-
-        #top-info {
-            position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5);
-            padding: 5px 10px; border-radius: 5px; font-size: 12px; z-index: 1000;
+        input[type=range] { width: 100%; margin-top: 15px; cursor: pointer; accent-color: #00ff88; }
+        
+        /* Pannello Dati Tecnico */
+        .data-panel { position: absolute; top: 10px; left: 10px; color: #00ff88; font-size: 11px; background: rgba(0,0,0,0.6); padding: 8px; border-radius: 5px; pointer-events: none; font-family: monospace; z-index: 10; }
+        
+        /* MIRINO CENTRALE DI PRECISIONE */
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 40px; height: 40px; z-index: 20; pointer-events: none;
+        }
+        #crosshair::before, #crosshair::after {
+            content: ''; position: absolute; background: #00ff88;
+        }
+        /* Linea orizzontale */
+        #crosshair::before { top: 50%; left: -10px; right: -10px; height: 2px; transform: translateY(-50%); }
+        /* Linea verticale */
+        #crosshair::after { left: 50%; top: -10px; bottom: -10px; width: 2px; transform: translateX(-50%); }
+        /* Cerchio centrale */
+        .crosshair-circle {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            border: 2px solid #00ff88; border-radius: 50%; box-sizing: border-box;
         }
     </style>
 </head>
 <body>
 
     <div id="overlay">
-        <h2>ALLINEAMENTO NASA</h2>
-        <p>Cielo calcolando... Offset impostato a +69° per il tuo dispositivo.</p>
-        <button id="start-btn">SBLOCCA SENSORI E INIZIA</button>
+        <h1>Celestial AR</h1>
+        <p>1. Trova la Luna o il Sole reale.</p>
+        <p>2. Mettili nel mirino al centro dello schermo.</p>
+        <p>3. Usa la barra in basso per far combaciare la sfera virtuale.</p>
+        <button id="start-btn">INIZIA OSSERVAZIONE</button>
     </div>
 
-    <div id="top-info">Attendere coordinate GPS...</div>
+    <div class="data-panel" id="debug-info">Acquisizione GPS...</div>
 
-    <div id="hud" style="display: none;">
-        <div class="hud-row">
-            <span>Bussola Telefono:</span>
-            <span id="raw-heading" class="hud-value">--°</span>
-        </div>
-        <div class="hud-row">
-            <span>Compensazione:</span>
-            <span id="offset-val" class="hud-value" style="color: #ffcc00;">+69°</span>
-        </div>
-        <input type="range" id="azimuth-slider" min="-180" max="180" value="69">
+    <div id="crosshair">
+        <div class="crosshair-circle"></div>
+    </div>
+
+    <div id="controls">
+        <label style="font-weight: bold; color: #00ff88;">Allineamento Fine della Bussola</label>
+        <input type="range" id="azimuth-slider" min="0" max="360" value="0">
     </div>
 
     <a-scene vr-mode-ui="enabled: false" arjs="sourceType: webcam; debugUIEnabled: false;" renderer="logarithmicDepthBuffer: true;">
-        <a-camera id="main-camera" position="0 1.6 0" look-controls="magicWindowTrackingEnabled: true; touchEnabled: false;"></a-camera>
+        
+        <a-camera id="main-camera" look-controls="magicWindowTrackingEnabled: true; touchEnabled: false;"></a-camera>
 
-        <a-entity id="celestial-vault" rotation="0 69 0">
-            <a-sphere id="sun" radius="8" color="#FFD700" material="emissive: #FFD700"></a-sphere>
+        <a-entity id="celestial-vault">
+            
+            <a-sphere id="sun" radius="3" color="#FFD700" material="emissive: #FFD700; emissiveIntensity: 2; opacity: 0.9"></a-sphere>
             <a-text value="SOLE" id="sun-label" align="center" scale="25 25 25" color="#FFD700"></a-text>
 
-            <a-sphere id="moon" radius="6" color="#FFFFFF"></a-sphere>
+            <a-sphere id="moon" radius="2" color="#FFFFFF" material="emissive: #FFFFFF; emissiveIntensity: 1; opacity: 0.9"></a-sphere>
             <a-text value="LUNA" id="moon-label" align="center" scale="20 20 20" color="#FFFFFF"></a-text>
 
-            <a-sphere id="mars" radius="3" color="#FF4500"></a-sphere>
+            <a-sphere id="mars" radius="0.8" color="#FF4500"></a-sphere>
             <a-text value="MARTE" id="mars-label" align="center" scale="15 15 15" color="#FF4500"></a-text>
 
-            <a-sphere id="venus" radius="4" color="#FFFFDD"></a-sphere>
-            <a-text value="VENERE" id="venus-label" align="center" scale="15 15 15" color="#FFFFDD"></a-text>
+            <a-entity id="stars-container"></a-entity>
 
-            <a-sphere id="jupiter" radius="5" color="#FFAA88"></a-sphere>
-            <a-text value="GIOVE" id="jupiter-label" align="center" scale="15 15 15" color="#FFAA88"></a-text>
-
-            <a-sphere id="saturn" radius="4" color="#F4E4BA"></a-sphere>
-            <a-text value="SATURNO" id="saturn-label" align="center" scale="15 15 15" color="#F4E4BA"></a-text>
         </a-entity>
+
     </a-scene>
 
     <script>
         const vault = document.getElementById('celestial-vault');
+        const starsContainer = document.getElementById('stars-container');
         const slider = document.getElementById('azimuth-slider');
-        const topInfo = document.getElementById('top-info');
-        const rawHeadingEl = document.getElementById('raw-heading');
-        const offsetValEl = document.getElementById('offset-val');
+        const debug = document.getElementById('debug-info');
 
-        // Impostiamo il tuo offset di fabbrica
-        let currentOffset = 69;
-
-        function getVector(alt, az, dist = 500) {
+        function getVector(alt, az, dist) {
             const altRad = alt * (Math.PI / 180);
             const azRad = az * (Math.PI / 180);
             return {
@@ -106,75 +116,14 @@
             };
         }
 
-        function updatePositions(lat, lon) {
+        function updateAllPositions(lat, lon) {
             const date = new Date();
             const observer = new Astronomy.Observer(lat, lon, 0);
             
-            // Il catalogo dei pianeti che calcoleremo
-            const bodies = ['Sun', 'Moon', 'Mars', 'Venus', 'Jupiter', 'Saturn'];
-            
+            debug.innerHTML = `GPS: ${lat.toFixed(2)}, ${lon.toFixed(2)}<br>Ora: ${date.toLocaleTimeString()}`;
+
+            // Sistema Solare
+            const bodies = ['Sun', 'Moon', 'Mars'];
             bodies.forEach(name => {
                 const equ = Astronomy.Equator(name, date, observer, true, true);
-                const hor = Astronomy.Horizon(date, observer, equ.ra, equ.dec, 'normal');
-                const pos = getVector(hor.altitude, hor.azimuth);
-                
-                const el = document.getElementById(name.toLowerCase());
-                const label = document.getElementById(name.toLowerCase() + '-label');
-                
-                if(el) el.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
-                // Etichetta sopra il pianeta e girata verso l'utente
-                if(label) {
-                    label.setAttribute('position', `${pos.x} ${pos.y + 15} ${pos.z}`);
-                    label.setAttribute('look-at', '#main-camera');
-                }
-            });
-
-            topInfo.innerHTML = `Lat: ${lat.toFixed(2)} Lon: ${lon.toFixed(2)} | Ora: ${date.toLocaleTimeString()}`;
-        }
-
-        function handleOrientation(event) {
-            let heading = 0;
-            if (event.webkitCompassHeading !== undefined) {
-                heading = event.webkitCompassHeading;
-            } else if (event.alpha !== null) {
-                heading = 360 - event.alpha;
-            }
-            rawHeadingEl.textContent = Math.round(heading) + "°";
-        }
-
-        document.getElementById('start-btn').addEventListener('click', async () => {
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                try {
-                    const permission = await DeviceOrientationEvent.requestPermission();
-                    if (permission === 'granted') {
-                        window.addEventListener('deviceorientation', handleOrientation);
-                    }
-                } catch (e) { alert("Errore sensori."); }
-            } else {
-                if ('ondeviceorientationabsolute' in window) {
-                    window.addEventListener('deviceorientationabsolute', handleOrientation);
-                } else {
-                    window.addEventListener('deviceorientation', handleOrientation);
-                }
-            }
-
-            navigator.geolocation.getCurrentPosition((pos) => {
-                updatePositions(pos.coords.latitude, pos.coords.longitude);
-                // Ricalcola ogni 60 secondi
-                setInterval(() => updatePositions(pos.coords.latitude, pos.coords.longitude), 60000);
-                
-                document.getElementById('overlay').style.display = 'none';
-                document.getElementById('hud').style.display = 'block';
-            }, (err) => {
-                alert("Attiva il GPS per l'allineamento stellare.");
-            });
-        });
-
-        slider.addEventListener('input', (e) => {
-            currentOffset = parseInt(e.target.value);
-            offsetValEl.textContent = currentOffset > 0 ? `+${currentOffset}°` : `${currentOffset}°`;
-            vault.setAttribute('rotation', `0 ${currentOffset} 0`);
-        });
-    </script>
-</body>
-</html>
+                const hor = Astronomy.Horizon(date, observer
