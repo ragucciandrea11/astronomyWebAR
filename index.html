@@ -3,88 +3,121 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Celestial AR v2.0</title>
+    <title>NASA-Ready Sky v3.0</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: monospace; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-        #btn-start { padding: 25px 50px; font-size: 20px; background: #0f0; border: none; border-radius: 50px; font-weight: bold; cursor: pointer; box-shadow: 0 0 20px #0f0; }
-        #console { position: absolute; top: 10px; left: 10px; color: #0f0; font-size: 10px; z-index: 10001; pointer-events: none; background: rgba(0,0,0,0.5); }
-        #controls { position: absolute; bottom: 20px; width: 100%; z-index: 10001; text-align: center; display: none; }
-        input[type=range] { width: 80%; height: 30px; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #00ff88; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        #btn-start { padding: 25px 50px; font-size: 22px; background: #00ff88; color: black; border: none; border-radius: 50px; font-weight: bold; cursor: pointer; }
+        #controls { position: absolute; bottom: 20px; width: 100%; z-index: 10001; text-align: center; background: rgba(0,0,0,0.7); padding: 10px 0; color: white; }
+        input[type=range] { width: 80%; }
+        #crosshair { position: fixed; top: 50%; left: 50%; width: 30px; height: 30px; border: 2px solid rgba(0,255,136,0.5); border-radius: 50%; transform: translate(-50%, -50%); z-index: 100; pointer-events: none; }
     </style>
 </head>
 <body>
 
-    <div id="console">In attesa di avvio...</div>
+    <div id="crosshair"></div>
 
     <div id="overlay">
-        <h1>CELESTIAL AR</h1>
-        <p>Sistema di puntamento NASA-ready</p>
-        <button id="btn-start">ATTIVA VISORE</button>
+        <h1>CELESTIAL NAVIGATOR</h1>
+        <p>Puntatore Astronomico di Precisione</p>
+        <button id="btn-start">ATTIVA SISTEMI</button>
     </div>
 
     <div id="controls">
         <input type="range" id="slider" min="0" max="360" value="0">
-        <p style="color: white; margin: 5px;">Trascina per allineare i nomi alle stelle</p>
+        <p>Allineamento Manuale (Ruota il cielo)</p>
     </div>
 
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false" loading-screen="enabled: false">
         <a-camera id="cam" look-controls="touchEnabled: false;"></a-camera>
         <a-entity id="vault">
-            <a-entity id="stars-group"></a-entity>
-            <a-sphere id="moon-obj" radius="1.5" color="#fff" material="emissive:#fff; emissiveIntensity:0.5"></a-sphere>
-            <a-text id="moon-label" value="LUNA" align="center" scale="12 12 12"></a-text>
-        </a-entity>
+            </a-entity>
     </a-scene>
 
     <script>
-        const log = (msg) => { document.getElementById('console').innerHTML += "<br>> " + msg; console.log(msg); };
-        const btn = document.getElementById('btn-start');
         const vault = document.getElementById('vault');
+        const btn = document.getElementById('btn-start');
+        
+        // Database semplificato delle stelle più luminose (Nome, RA, DEC)
+        const brightStars = [
+            {n: "SIRIO", ra: 6.75, dec: -16.71},
+            {n: "VEGA", ra: 18.61, dec: 38.78},
+            {n: "BETELGEUSE", ra: 5.92, dec: 7.41},
+            {n: "RIGEL", ra: 5.24, dec: -8.20},
+            {n: "ARTURO", ra: 14.26, dec: 19.18},
+            {n: "ALDEBARAN", ra: 4.59, dec: 16.51},
+            {n: "POLARE", ra: 2.52, dec: 89.26}
+        ];
+
+        function createCelestialBody(name, alt, az, color, size, dist) {
+            const altRad = alt * (Math.PI/180);
+            const azRad = az * (Math.PI/180);
+            const x = dist * Math.cos(altRad) * Math.sin(azRad);
+            const y = dist * Math.sin(altRad);
+            const z = dist * Math.cos(altRad) * -Math.cos(azRad);
+
+            // Sfera
+            const el = document.createElement('a-sphere');
+            el.setAttribute('position', `${x} ${y} ${z}`);
+            el.setAttribute('radius', size);
+            el.setAttribute('color', color);
+            if(color === '#fff' || color === 'yellow') {
+                el.setAttribute('material', 'emissive', color);
+                el.setAttribute('material', 'emissiveIntensity', 1);
+            }
+            vault.appendChild(el);
+
+            // Nome
+            const txt = document.createElement('a-text');
+            txt.setAttribute('value', name);
+            txt.setAttribute('position', `${x} ${y + (size*2)} ${z}`);
+            txt.setAttribute('align', 'center');
+            txt.setAttribute('scale', `${size*15} ${size*15} ${size*15}`);
+            txt.setAttribute('look-at', '#cam'); // Opzionale: guarda sempre la camera
+            vault.appendChild(txt);
+        }
 
         btn.onclick = async () => {
-            log("Inizializzazione...");
             document.getElementById('overlay').style.display = 'none';
-            document.getElementById('controls').style.display = 'block';
 
-            // 1. Chiedo sensori
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                try {
-                    const res = await DeviceOrientationEvent.requestPermission();
-                    log("Sensori: " + res);
-                } catch(e) { log("Errore sensori: " + e); }
+            if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                await DeviceOrientationEvent.requestPermission();
             }
 
-            // 2. Astronomia
-            try {
-                const lat = 41.89, lon = 12.49; // Default Roma
-                const date = new Date();
-                const obs = new Astronomy.Observer(lat, lon, 0);
-                
-                // Luna
-                const equ = Astronomy.Equator('Moon', date, obs, true, true);
-                const hor = Astronomy.Horizon(date, obs, equ.ra, equ.dec, 'normal');
-                const altRad = hor.altitude * (Math.PI/180);
-                const azRad = hor.azimuth * (Math.PI/180);
-                const d = 300;
-                const x = d * Math.cos(altRad) * Math.sin(azRad);
-                const y = d * Math.sin(altRad);
-                const z = d * Math.cos(altRad) * -Math.cos(azRad);
-                
-                document.getElementById('moon-obj').setAttribute('position', `${x} ${y} ${z}`);
-                document.getElementById('moon-label').setAttribute('position', `${x} ${y+10} ${z}`);
-                log("Astronomia caricata.");
-                
-                // GPS Reale
-                navigator.geolocation.getCurrentPosition((p) => {
-                    log("GPS reale agganciato.");
-                    // Qui si potrebbe ricalcolare con la posizione esatta
-                });
+            const date = new Date();
+            const obs = new Astronomy.Observer(41.89, 12.49, 0); // Default Roma
 
-            } catch(e) { log("Errore logica: " + e); }
+            // 1. PIANETI E LUNA
+            const bodies = [
+                {id: 'Moon', n: 'LUNA', c: '#fff', s: 1.5},
+                {id: 'Mars', n: 'MARTE', c: '#ff4500', s: 0.8},
+                {id: 'Jupiter', n: 'GIOVE', c: '#ffcc99', s: 1.2},
+                {id: 'Saturn', n: 'SATURNO', c: '#f0e68c', s: 1.0},
+                {id: 'Venus', n: 'VENERE', c: '#e6e6e6', s: 0.9}
+            ];
+
+            bodies.forEach(b => {
+                const equ = Astronomy.Equator(b.id, date, obs, true, true);
+                const hor = Astronomy.Horizon(date, obs, equ.ra, equ.dec, 'normal');
+                createCelestialBody(b.n, hor.altitude, hor.azimuth, b.c, b.s, 300);
+            });
+
+            // 2. STELLE
+            brightStars.forEach(s => {
+                const hor = Astronomy.Horizon(date, obs, s.ra, s.dec, 'normal');
+                if(hor.altitude > -20) { // Mostra anche stelle appena sotto l'orizzonte
+                    createCelestialBody(s.n, hor.altitude, hor.azimuth, '#fff', 0.4, 400);
+                }
+            });
+
+            // 3. TENTATIVO GPS REALE
+            navigator.geolocation.getCurrentPosition((p) => {
+                // Se vuoi precisione assoluta, qui dovresti svuotare il vault e ricalcolare
+                console.log("GPS Aggiornato");
+            });
         };
 
         document.getElementById('slider').oninput = (e) => {
