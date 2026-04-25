@@ -3,132 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Celestial AR v1.1 - Fix</title>
-    
+    <title>Celestial AR - Force Start</title>
     <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #000; }
+        body { margin: 0; overflow: hidden; background: #000; }
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); color: white; z-index: 9999;
+            background: #000; color: white; z-index: 9999;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            text-align: center; padding: 20px; box-sizing: border-box;
         }
-        #start-btn {
-            padding: 20px 40px; font-size: 22px; background: #00ff88; color: black;
-            border: none; border-radius: 50px; cursor: pointer; font-weight: bold; box-shadow: 0 0 20px #00ff88;
-        }
-        #controls {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            width: 80%; background: rgba(0,0,0,0.7); padding: 15px;
-            border-radius: 15px; color: white; z-index: 10; text-align: center; display: none;
-        }
-        input[type=range] { width: 100%; margin-top: 10px; }
-        .data-panel { position: absolute; top: 10px; left: 10px; color: #00ff88; font-size: 11px; background: rgba(0,0,0,0.5); padding: 5px; z-index: 100; pointer-events: none; }
+        #btn { padding: 20px; font-size: 20px; background: #00ff88; border: none; border-radius: 10px; cursor: pointer; }
+        #controls { position: absolute; bottom: 20px; width: 100%; text-align: center; z-index: 100; display:none; }
+        .info { position: absolute; top: 10px; color: #00ff88; z-index: 100; background: rgba(0,0,0,0.5); padding: 5px; font-size: 10px; }
     </style>
 </head>
 <body>
-
     <div id="overlay">
         <h1>Celestial AR</h1>
-        <p>Attivazione sensori astronomici...</p>
-        <button id="start-btn">INIZIA OSSERVAZIONE</button>
+        <button id="btn">FORZA AVVIO (Anche al chiuso)</button>
     </div>
-
-    <div class="data-panel" id="debug-info">Sistema Pronto.</div>
-
+    <div class="info" id="status">In attesa...</div>
     <div id="controls">
-        <label>Allineamento Bussola</label>
-        <input type="range" id="azimuth-slider" min="0" max="360" value="0">
+        <input type="range" id="slider" min="0" max="360" style="width: 80%">
+        <p style="color: white">Trascina per allineare le stelle</p>
     </div>
-
-    <a-scene vr-mode-ui="enabled: false" arjs="sourceType: webcam; debugUIEnabled: false;" renderer="logarithmicDepthBuffer: true;">
-        <a-camera id="main-camera" look-controls="magicWindowTrackingEnabled: true; touchEnabled: false;"></a-camera>
-        <a-entity id="celestial-vault">
-            <a-sphere id="sun" radius="3" color="#FFD700" material="emissive: #FFD700; emissiveIntensity: 2; opacity: 0.8"></a-sphere>
-            <a-text value="SOLE" id="sun-label" align="center" scale="20 20 20"></a-text>
-            <a-sphere id="moon" radius="2" color="#F0F0F0" material="opacity: 0.8"></a-sphere>
-            <a-text value="LUNA" id="moon-label" align="center" scale="15 15 15"></a-text>
-            <a-entity id="stars-container"></a-entity>
+    <a-scene vr-mode-ui="enabled: false" arjs="sourceType: webcam; debugUIEnabled: false;">
+        <a-camera id="cam" look-controls="touchEnabled: false;"></a-camera>
+        <a-entity id="vault">
+            <a-sphere id="moon" radius="2" color="#EEE"></a-sphere>
+            <a-text id="moon-txt" value="LUNA" align="center" scale="15 15 15"></a-text>
+            <a-entity id="stars"></a-entity>
         </a-entity>
     </a-scene>
-
     <script>
-        const vault = document.getElementById('celestial-vault');
-        const starsContainer = document.getElementById('stars-container');
-        const slider = document.getElementById('azimuth-slider');
-        const debug = document.getElementById('debug-info');
+        const btn = document.getElementById('btn');
+        const vault = document.getElementById('vault');
+        const status = document.getElementById('status');
 
-        function getVector(alt, az, dist) {
-            const altRad = alt * (Math.PI / 180);
-            const azRad = az * (Math.PI / 180);
-            return {
-                x: dist * Math.cos(altRad) * Math.sin(azRad),
-                y: dist * Math.sin(altRad),
-                z: dist * Math.cos(altRad) * -Math.cos(azRad)
-            };
-        }
-
-        function updateAllPositions(lat, lon) {
+        function draw(lat, lon) {
             const date = new Date();
-            const observer = new Astronomy.Observer(lat, lon, 0);
-            debug.innerHTML = `GPS OK: ${lat.toFixed(2)}, ${lon.toFixed(2)} | AR Attiva`;
-
-            ['Sun', 'Moon'].forEach(name => {
-                const equ = Astronomy.Equator(name, date, observer, true, true);
-                const hor = Astronomy.Horizon(date, observer, equ.ra, equ.dec, 'normal');
-                const pos = getVector(hor.altitude, hor.azimuth, 400);
-                document.getElementById(name.toLowerCase()).setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
-                document.getElementById(name.toLowerCase() + '-label').setAttribute('position', `${pos.x} ${pos.y + 10} ${pos.z}`);
-            });
-            
-            // Carichiamo 30 stelle principali
-            starsContainer.innerHTML = '';
-            for (let i = 1; i <= 30; i++) {
-                const star = Astronomy.StarDefinition(`HD${i}`);
-                if (!star) continue;
-                const hor = Astronomy.Horizon(date, observer, star.ra, star.dec, 'normal');
-                if (hor.altitude > -10) { // Anche un po' sotto l'orizzonte
-                    const pos = getVector(hor.altitude, hor.azimuth, 500);
-                    const s = document.createElement('a-sphere');
-                    s.setAttribute('radius', '0.5'); s.setAttribute('color', '#fff');
-                    s.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
-                    const t = document.createElement('a-text');
-                    t.setAttribute('value', `Stella ${i}`); t.setAttribute('align', 'center');
-                    t.setAttribute('scale', '12 12 12'); t.setAttribute('position', `${pos.x} ${pos.y + 6} ${pos.z}`);
-                    starsContainer.appendChild(s); starsContainer.appendChild(t);
-                }
-            }
+            const obs = new Astronomy.Observer(lat, lon, 0);
+            const equ = Astronomy.Equator('Moon', date, obs, true, true);
+            const hor = Astronomy.Horizon(date, obs, equ.ra, equ.dec, 'normal');
+            const altRad = hor.altitude * (Math.PI/180);
+            const azRad = hor.azimuth * (Math.PI/180);
+            const d = 400;
+            const pos = { x: d * Math.cos(altRad) * Math.sin(azRad), y: d * Math.sin(altRad), z: d * Math.cos(altRad) * -Math.cos(azRad) };
+            document.getElementById('moon').setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
+            document.getElementById('moon-txt').setAttribute('position', `${pos.x} ${pos.y+10} ${pos.z}`);
+            status.innerHTML = `Posizione caricata (${lat.toFixed(1)}, ${lon.toFixed(1)})`;
         }
 
-        document.getElementById('start-btn').addEventListener('click', async () => {
-            // AZIONE 1: Sparisce tutto subito
+        btn.onclick = async () => {
+            // 1. Chiudi subito l'overlay
             document.getElementById('overlay').style.display = 'none';
             document.getElementById('controls').style.display = 'block';
 
-            // AZIONE 2: Permessi (se necessari)
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                try { await DeviceOrientationEvent.requestPermission(); } catch(e) { console.error(e); }
+            // 2. Chiedi sensori (obbligatorio per movimento)
+            if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                await DeviceOrientationEvent.requestPermission();
             }
 
-            // AZIONE 3: GPS con Fallback
-            debug.innerHTML = "Acquisizione GPS...";
-            navigator.geolocation.getCurrentPosition(
-                (pos) => { updateAllPositions(pos.coords.latitude, pos.coords.longitude); },
-                (err) => { 
-                    debug.innerHTML = "GPS non disponibile. Uso posizione di default (Roma).";
-                    updateAllPositions(41.89, 12.49); // Fallback su Roma
-                },
-                { timeout: 5000 }
-            );
-        });
+            // 3. Carica il cielo con posizione di default (Roma) mentre cerca il GPS vero
+            draw(41.9, 12.5); 
 
-        slider.addEventListener('input', (e) => {
+            navigator.geolocation.getCurrentPosition(
+                (p) => draw(p.coords.latitude, p.coords.longitude),
+                (e) => console.log("Uso default"),
+                { timeout: 2000 }
+            );
+        };
+
+        document.getElementById('slider').oninput = (e) => {
             vault.setAttribute('rotation', `0 ${e.target.value} 0`);
-        });
+        };
     </script>
 </body>
 </html>
