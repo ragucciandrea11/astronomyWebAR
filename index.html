@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>WebAR Celestial Simulator - Fase 4</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        
+        /* Schermata di Benvenuto / Permessi */
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); color: white; z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            text-align: center; padding: 20px; box-sizing: border-box;
+        }
+
+        #start-btn {
+            padding: 20px 40px; font-size: 22px; background: #00ff88; color: black;
+            border: none; border-radius: 50px; cursor: pointer; font-weight: bold; margin-top: 20px;
+        }
+
+        /* Controlli di Calibrazione in basso */
+        #controls {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 80%; background: rgba(0,0,0,0.7); padding: 15px;
+            border-radius: 15px; color: white; z-index: 10; text-align: center;
+        }
+
+        input[type=range] { width: 100%; margin-top: 10px; }
+        .data-panel { position: absolute; top: 10px; left: 10px; color: #00ff88; font-size: 12px; background: rgba(0,0,0,0.5); padding: 5px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <div id="overlay">
+        <h1>Celestial AR v1.0</h1>
+        <p>Punta il telefono verso il cielo per vedere pianeti e costellazioni.</p>
+        <p style="font-size: 0.8em;">(Richiede accesso a GPS, Fotocamera e Giroscopio)</p>
+        <button id="start-btn">INIZIA OSSERVAZIONE</button>
+    </div>
+
+    <div class="data-panel" id="debug-info">In attesa del GPS...</div>
+
+    <div id="controls">
+        <label>Allineamento Bussola (Offset)</label>
+        <input type="range" id="azimuth-slider" min="0" max="360" value="0">
+    </div>
+
+    <a-scene vr-mode-ui="enabled: false" arjs="sourceType: webcam; debugUIEnabled: false;" renderer="logarithmicDepthBuffer: true;">
+        
+        <a-camera id="main-camera" look-controls="magicWindowTrackingEnabled: true; touchEnabled: false;"></a-camera>
+
+        <a-entity id="celestial-vault">
+            <a-sphere id="sun" radius="5" color="#FFD700" material="emissive: #FFD700; emissiveIntensity: 2"></a-sphere>
+            <a-text value="SOLE" id="sun-label" align="center" scale="20 20 20"></a-text>
+
+            <a-sphere id="moon" radius="4" color="#F0F0F0"></a-sphere>
+            <a-text value="LUNA" id="moon-label" align="center" scale="15 15 15"></a-text>
+
+            <a-sphere id="mars" radius="2" color="#FF4500"></a-sphere>
+            <a-text value="MARTE" id="mars-label" align="center" scale="10 10 10"></a-text>
+        </a-entity>
+
+    </a-scene>
+
+    <script>
+        const vault = document.getElementById('celestial-vault');
+        const slider = document.getElementById('azimuth-slider');
+        const debug = document.getElementById('debug-info');
+        let currentOffset = 0;
+
+        // Funzione per mappare Azimuth/Altezza in 3D
+        function getVector(alt, az, dist = 500) {
+            const altRad = alt * (Math.PI / 180);
+            const azRad = az * (Math.PI / 180);
+            return {
+                x: dist * Math.cos(altRad) * Math.sin(azRad),
+                y: dist * Math.sin(altRad),
+                z: dist * Math.cos(altRad) * -Math.cos(azRad)
+            };
+        }
+
+        // Funzione di aggiornamento posizioni
+        function updatePositions(lat, lon) {
+            const date = new Date();
+            const observer = new Astronomy.Observer(lat, lon, 0);
+            
+            const bodies = ['Sun', 'Moon', 'Mars'];
+            bodies.forEach(name => {
+                const equ = Astronomy.Equator(name, date, observer, true, true);
+                const hor = Astronomy.Horizon(date, observer, equ.ra, equ.dec, 'normal');
+                const pos = getVector(hor.altitude, hor.azimuth);
+                
+                const el = document.getElementById(name.toLowerCase());
+                const label = document.getElementById(name.toLowerCase() + '-label');
+                
+                if(el) el.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
+                if(label) label.setAttribute('position', `${pos.x} ${pos.y + 10} ${pos.z}`);
+            });
+
+            debug.innerHTML = `GPS: ${lat.toFixed(2)}, ${lon.toFixed(2)} | Ora: ${date.toLocaleTimeString()}`;
+        }
+
+        // Gestione Permessi e Inizio
+        document.getElementById('start-btn').addEventListener('click', async () => {
+            // 1. Richiesta permessi iOS (DeviceOrientation)
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                await DeviceOrientationEvent.requestPermission();
+            }
+
+            // 2. Geolocalizzazione
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                
+                updatePositions(lat, lon);
+                // Aggiorna ogni minuto
+                setInterval(() => updatePositions(lat, lon), 60000);
+                
+                document.getElementById('overlay').style.display = 'none';
+            }, (err) => {
+                alert("Errore GPS: Consenti l'accesso alla posizione per vedere le stelle.");
+            });
+        });
+
+        // Calibrazione Manuale: Ruota l'intera volta celeste
+        slider.addEventListener('input', (e) => {
+            currentOffset = e.target.value;
+            vault.setAttribute('rotation', `0 ${currentOffset} 0`);
+        });
+
+    </script>
+</body>
+</html>
