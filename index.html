@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Celestial AR - Allineamento Perfetto</title>
+    <title>Celestial AR - Auto Allineamento</title>
     
     <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
@@ -12,7 +12,6 @@
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: black; }
         
-        /* Schermata di Benvenuto */
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); color: white; z-index: 9999;
@@ -23,88 +22,45 @@
         #start-btn {
             padding: 20px 40px; font-size: 22px; background: #00ff88; color: black;
             border: none; border-radius: 50px; cursor: pointer; font-weight: bold; margin-top: 20px;
-            box-shadow: 0 0 15px #00ff88;
         }
 
-        /* Controlli di Calibrazione */
-        #controls {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            width: 85%; background: rgba(0,0,0,0.85); padding: 15px;
-            border-radius: 15px; color: white; z-index: 10; text-align: center;
-            border: 1px solid #00ff88;
-        }
-
-        input[type=range] { width: 100%; margin-top: 15px; cursor: pointer; accent-color: #00ff88; }
-        
-        /* Pannello Dati Tecnico */
-        .data-panel { position: absolute; top: 10px; left: 10px; color: #00ff88; font-size: 11px; background: rgba(0,0,0,0.6); padding: 8px; border-radius: 5px; pointer-events: none; font-family: monospace; z-index: 10; }
-        
-        /* MIRINO CENTRALE DI PRECISIONE */
-        #crosshair {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 40px; height: 40px; z-index: 20; pointer-events: none;
-        }
-        #crosshair::before, #crosshair::after {
-            content: ''; position: absolute; background: #00ff88;
-        }
-        /* Linea orizzontale */
-        #crosshair::before { top: 50%; left: -10px; right: -10px; height: 2px; transform: translateY(-50%); }
-        /* Linea verticale */
-        #crosshair::after { left: 50%; top: -10px; bottom: -10px; width: 2px; transform: translateX(-50%); }
-        /* Cerchio centrale */
-        .crosshair-circle {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            border: 2px solid #00ff88; border-radius: 50%; box-sizing: border-box;
+        .data-panel { 
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); 
+            color: #00ff88; font-size: 14px; background: rgba(0,0,0,0.8); 
+            padding: 10px 20px; border-radius: 10px; text-align: center;
+            border: 1px solid #00ff88; z-index: 10;
         }
     </style>
 </head>
 <body>
 
     <div id="overlay">
-        <h1>Celestial AR</h1>
-        <p>1. Trova la Luna o il Sole reale.</p>
-        <p>2. Mettili nel mirino al centro dello schermo.</p>
-        <p>3. Usa la barra in basso per far combaciare la sfera virtuale.</p>
-        <button id="start-btn">INIZIA OSSERVAZIONE</button>
+        <h1>Celestial AR (Auto)</h1>
+        <p>L'app leggerà la bussola del tuo telefono per allineare le stelle automaticamente.</p>
+        <button id="start-btn">AVVIA FOTOCAMERA E SENSORI</button>
     </div>
 
-    <div class="data-panel" id="debug-info">Acquisizione GPS...</div>
-
-    <div id="crosshair">
-        <div class="crosshair-circle"></div>
-    </div>
-
-    <div id="controls">
-        <label style="font-weight: bold; color: #00ff88;">Allineamento Fine della Bussola</label>
-        <input type="range" id="azimuth-slider" min="0" max="360" value="0">
-    </div>
+    <div class="data-panel" id="compass-status">Bussola in attesa...</div>
 
     <a-scene vr-mode-ui="enabled: false" arjs="sourceType: webcam; debugUIEnabled: false;" renderer="logarithmicDepthBuffer: true;">
-        
         <a-camera id="main-camera" look-controls="magicWindowTrackingEnabled: true; touchEnabled: false;"></a-camera>
 
         <a-entity id="celestial-vault">
-            
-            <a-sphere id="sun" radius="3" color="#FFD700" material="emissive: #FFD700; emissiveIntensity: 2; opacity: 0.9"></a-sphere>
+            <a-sphere id="sun" radius="3" color="#FFD700" material="emissive: #FFD700"></a-sphere>
             <a-text value="SOLE" id="sun-label" align="center" scale="25 25 25" color="#FFD700"></a-text>
 
-            <a-sphere id="moon" radius="2" color="#FFFFFF" material="emissive: #FFFFFF; emissiveIntensity: 1; opacity: 0.9"></a-sphere>
+            <a-sphere id="moon" radius="2" color="#FFFFFF" material="emissive: #FFFFFF"></a-sphere>
             <a-text value="LUNA" id="moon-label" align="center" scale="20 20 20" color="#FFFFFF"></a-text>
 
-            <a-sphere id="mars" radius="0.8" color="#FF4500"></a-sphere>
-            <a-text value="MARTE" id="mars-label" align="center" scale="15 15 15" color="#FF4500"></a-text>
-
             <a-entity id="stars-container"></a-entity>
-
         </a-entity>
-
     </a-scene>
 
     <script>
         const vault = document.getElementById('celestial-vault');
         const starsContainer = document.getElementById('stars-container');
-        const slider = document.getElementById('azimuth-slider');
-        const debug = document.getElementById('debug-info');
+        const statusDisplay = document.getElementById('compass-status');
+        let initialCompassOffset = null; // Memorizza la posizione iniziale del nord
 
         function getVector(alt, az, dist) {
             const altRad = alt * (Math.PI / 180);
@@ -116,14 +72,91 @@
             };
         }
 
-        function updateAllPositions(lat, lon) {
+        function buildSky(lat, lon) {
             const date = new Date();
             const observer = new Astronomy.Observer(lat, lon, 0);
             
-            debug.innerHTML = `GPS: ${lat.toFixed(2)}, ${lon.toFixed(2)}<br>Ora: ${date.toLocaleTimeString()}`;
-
-            // Sistema Solare
-            const bodies = ['Sun', 'Moon', 'Mars'];
-            bodies.forEach(name => {
+            // Sole e Luna
+            ['Sun', 'Moon'].forEach(name => {
                 const equ = Astronomy.Equator(name, date, observer, true, true);
-                const hor = Astronomy.Horizon(date, observer
+                const hor = Astronomy.Horizon(date, observer, equ.ra, equ.dec, 'normal');
+                const pos = getVector(hor.altitude, hor.azimuth, 400); 
+                
+                document.getElementById(name.toLowerCase()).setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
+                document.getElementById(name.toLowerCase() + '-label').setAttribute('position', `${pos.x} ${pos.y + 12} ${pos.z}`);
+            });
+
+            // Stelle (Le prime 50)
+            for (let id = 1; id <= 50; id++) {
+                const starRef = Astronomy.StarDefinition(`HD${id}`); 
+                if (!starRef) continue;
+                const hor = Astronomy.Horizon(date, observer, starRef.ra, starRef.dec, 'normal');
+                if (hor.altitude > 0) { 
+                    const pos = getVector(hor.altitude, hor.azimuth, 500);
+                    const starEl = document.createElement('a-sphere');
+                    starEl.setAttribute('radius', '0.4'); starEl.setAttribute('color', '#AADDFF');
+                    starEl.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
+                    
+                    const textEl = document.createElement('a-text');
+                    textEl.setAttribute('value', starRef.id || `HD${id}`);
+                    textEl.setAttribute('align', 'center'); textEl.setAttribute('scale', '15 15 15');
+                    textEl.setAttribute('color', '#AADDFF');
+                    textEl.setAttribute('position', `${pos.x} ${pos.y + 8} ${pos.z}`);
+                    
+                    starsContainer.appendChild(starEl); starsContainer.appendChild(textEl);
+                }
+            }
+        }
+
+        // Funzione per intercettare la Bussola
+        function handleOrientation(event) {
+            let compassHeading = null;
+
+            // Logica per iOS (Apple fornisce direttamente la bussola assoluta)
+            if (event.webkitCompassHeading) {
+                compassHeading = event.webkitCompassHeading;
+            } 
+            // Logica per Android (Usa l'alpha assoluto se disponibile)
+            else if (event.absolute && event.alpha !== null) {
+                compassHeading = 360 - event.alpha;
+            }
+
+            if (compassHeading !== null) {
+                // Arrotondiamo per evitare che il cielo tremi troppo
+                const headingInt = Math.round(compassHeading);
+                statusDisplay.innerHTML = `Nord Magnetico: ${headingInt}°`;
+                
+                // Ruotiamo la volta celeste nella direzione opposta alla bussola per allinearla
+                vault.setAttribute('rotation', `0 ${-compassHeading} 0`);
+            } else {
+                statusDisplay.innerHTML = "Sensore bussola non rilevato.";
+            }
+        }
+
+        document.getElementById('start-btn').addEventListener('click', async () => {
+            // Permessi iOS per i sensori
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                const permissionState = await DeviceOrientationEvent.requestPermission();
+                if (permissionState !== 'granted') {
+                    alert("Devi concedere i permessi per usare l'AR.");
+                    return;
+                }
+            }
+
+            // Attiviamo l'ascolto della bussola assoluta
+            window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+            // Fallback per dispositivi più vecchi o iOS
+            window.addEventListener('deviceorientation', handleOrientation, true);
+
+            // Prendiamo il GPS e costruiamo il cielo
+            navigator.geolocation.getCurrentPosition((pos) => {
+                buildSky(pos.coords.latitude, pos.coords.longitude);
+                document.getElementById('overlay').style.display = 'none';
+            }, (err) => {
+                alert("Consenti il GPS per calcolare la volta celeste!");
+            });
+        });
+
+    </script>
+</body>
+</html>
