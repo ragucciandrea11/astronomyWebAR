@@ -3,138 +3,199 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WebAR Celestial Simulator - Fase 4</title>
-    
-    <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-
+    <title>Tool Calibrazione Bussola AR</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        
-        /* Schermata di Benvenuto / Permessi */
-        #overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); color: white; z-index: 9999;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            text-align: center; padding: 20px; box-sizing: border-box;
+        body {
+            background-color: #111;
+            color: #00ff88;
+            font-family: 'Courier New', Courier, monospace;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            box-sizing: border-box;
         }
 
-        #start-btn {
-            padding: 20px 40px; font-size: 22px; background: #00ff88; color: black;
-            border: none; border-radius: 50px; cursor: pointer; font-weight: bold; margin-top: 20px;
+        h2 { color: #fff; margin-bottom: 5px; }
+
+        .panel {
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 10px;
+            padding: 20px;
+            width: 100%;
+            max-width: 400px;
+            margin-top: 20px;
         }
 
-        /* Controlli di Calibrazione in basso */
-        #controls {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            width: 80%; background: rgba(0,0,0,0.7); padding: 15px;
-            border-radius: 15px; color: white; z-index: 10; text-align: center;
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 18px;
         }
 
-        input[type=range] { width: 100%; margin-top: 10px; }
-        .data-panel { position: absolute; top: 10px; left: 10px; color: #00ff88; font-size: 12px; background: rgba(0,0,0,0.5); padding: 5px; pointer-events: none; }
+        .data-value { color: #fff; font-weight: bold; }
+
+        button {
+            background: #00ff88;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            max-width: 400px;
+            margin-top: 10px;
+        }
+
+        /* La Bussola Visiva */
+        #compass-container {
+            width: 200px;
+            height: 200px;
+            border: 4px solid #444;
+            border-radius: 50%;
+            position: relative;
+            margin: 30px auto;
+            background: #000;
+        }
+
+        #compass-needle {
+            width: 4px;
+            height: 100px;
+            background: red;
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform-origin: bottom center;
+            transform: translateX(-50%) rotate(0deg);
+            transition: transform 0.1s ease-out;
+        }
+
+        .compass-label { position: absolute; color: #666; font-weight: bold; }
+        .label-n { top: 5px; left: 50%; transform: translateX(-50%); color: red; }
+        .label-s { bottom: 5px; left: 50%; transform: translateX(-50%); }
+        .label-e { right: 5px; top: 50%; transform: translateY(-50%); }
+        .label-w { left: 5px; top: 50%; transform: translateY(-50%); }
+
+        input[type=range] {
+            width: 100%;
+            margin-top: 15px;
+        }
     </style>
 </head>
 <body>
 
-    <div id="overlay">
-        <h1>Celestial AR v1.0</h1>
-        <p>Punta il telefono verso il cielo per vedere pianeti e costellazioni.</p>
-        <p style="font-size: 0.8em;">(Richiede accesso a GPS, Fotocamera e Giroscopio)</p>
-        <button id="start-btn">INIZIA OSSERVAZIONE</button>
+    <h2>Test Sensori & Calibrazione</h2>
+    <p style="color: #aaa; font-size: 14px;">Diagnostica per AR Location-Based</p>
+
+    <button id="btn-start">Attiva Sensori (Richiede Tap)</button>
+
+    <div class="panel">
+        <div class="data-row">
+            <span>Bussola Grezza (Gradi):</span>
+            <span id="raw-heading" class="data-value">0°</span>
+        </div>
+        <div class="data-row" style="color: #ffaa00;">
+            <span>Offset Manuale:</span>
+            <span id="offset-val" class="data-value">0°</span>
+        </div>
+        <div class="data-row" style="border-top: 1px solid #444; padding-top: 10px; color: #00ffff;">
+            <span>Azimut Finale (AR):</span>
+            <span id="final-heading" class="data-value">0°</span>
+        </div>
+
+        <label style="display: block; margin-top: 20px; color: #aaa;">Calibrazione Bussola (Slider)</label>
+        <input type="range" id="offset-slider" min="-180" max="180" value="0">
     </div>
 
-    <div class="data-panel" id="debug-info">In attesa del GPS...</div>
-
-    <div id="controls">
-        <label>Allineamento Bussola (Offset)</label>
-        <input type="range" id="azimuth-slider" min="0" max="360" value="0">
+    <div id="compass-container">
+        <div class="compass-label label-n">N</div>
+        <div class="compass-label label-e">E</div>
+        <div class="compass-label label-s">S</div>
+        <div class="compass-label label-w">O</div>
+        <div id="compass-needle"></div>
     </div>
-
-    <a-scene vr-mode-ui="enabled: false" arjs="sourceType: webcam; debugUIEnabled: false;" renderer="logarithmicDepthBuffer: true;">
-        
-        <a-camera id="main-camera" look-controls="magicWindowTrackingEnabled: true; touchEnabled: false;"></a-camera>
-
-        <a-entity id="celestial-vault">
-            <a-sphere id="sun" radius="5" color="#FFD700" material="emissive: #FFD700; emissiveIntensity: 2"></a-sphere>
-            <a-text value="SOLE" id="sun-label" align="center" scale="20 20 20"></a-text>
-
-            <a-sphere id="moon" radius="4" color="#F0F0F0"></a-sphere>
-            <a-text value="LUNA" id="moon-label" align="center" scale="15 15 15"></a-text>
-
-            <a-sphere id="mars" radius="2" color="#FF4500"></a-sphere>
-            <a-text value="MARTE" id="mars-label" align="center" scale="10 10 10"></a-text>
-        </a-entity>
-
-    </a-scene>
 
     <script>
-        const vault = document.getElementById('celestial-vault');
-        const slider = document.getElementById('azimuth-slider');
-        const debug = document.getElementById('debug-info');
-        let currentOffset = 0;
+        const btnStart = document.getElementById('btn-start');
+        const rawHeadingEl = document.getElementById('raw-heading');
+        const finalHeadingEl = document.getElementById('final-heading');
+        const offsetValEl = document.getElementById('offset-val');
+        const slider = document.getElementById('offset-slider');
+        const needle = document.getElementById('compass-needle');
 
-        // Funzione per mappare Azimuth/Altezza in 3D
-        function getVector(alt, az, dist = 500) {
-            const altRad = alt * (Math.PI / 180);
-            const azRad = az * (Math.PI / 180);
-            return {
-                x: dist * Math.cos(altRad) * Math.sin(azRad),
-                y: dist * Math.sin(altRad),
-                z: dist * Math.cos(altRad) * -Math.cos(azRad)
-            };
+        let rawHeading = 0;
+        let offset = 0;
+
+        // Gestione dell'Offset manuale
+        slider.addEventListener('input', (e) => {
+            offset = parseInt(e.target.value);
+            offsetValEl.textContent = offset > 0 ? `+${offset}°` : `${offset}°`;
+            updateDisplay();
+        });
+
+        // Aggiorna lo schermo e ruota la bussola
+        function updateDisplay() {
+            let finalHeading = (rawHeading + offset) % 360;
+            if (finalHeading < 0) finalHeading += 360; // Evita numeri negativi
+
+            rawHeadingEl.textContent = Math.round(rawHeading) + "°";
+            finalHeadingEl.textContent = Math.round(finalHeading) + "°";
+
+            // Ruotiamo l'ago della bussola (direzione opposta al movimento)
+            needle.style.transform = `translateX(-50%) rotate(${finalHeading}deg)`;
         }
 
-        // Funzione di aggiornamento posizioni
-        function updatePositions(lat, lon) {
-            const date = new Date();
-            const observer = new Astronomy.Observer(lat, lon, 0);
-            
-            const bodies = ['Sun', 'Moon', 'Mars'];
-            bodies.forEach(name => {
-                const equ = Astronomy.Equator(name, date, observer, true, true);
-                const hor = Astronomy.Horizon(date, observer, equ.ra, equ.dec, 'normal');
-                const pos = getVector(hor.altitude, hor.azimuth);
-                
-                const el = document.getElementById(name.toLowerCase());
-                const label = document.getElementById(name.toLowerCase() + '-label');
-                
-                if(el) el.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
-                if(label) label.setAttribute('position', `${pos.x} ${pos.y + 10} ${pos.z}`);
-            });
-
-            debug.innerHTML = `GPS: ${lat.toFixed(2)}, ${lon.toFixed(2)} | Ora: ${date.toLocaleTimeString()}`;
-        }
-
-        // Gestione Permessi e Inizio
-        document.getElementById('start-btn').addEventListener('click', async () => {
-            // 1. Richiesta permessi iOS (DeviceOrientation)
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                await DeviceOrientationEvent.requestPermission();
+        // Il cuore del sistema: estrarre il Nord magnetico
+        function handleOrientation(event) {
+            // 1. Logica per iOS (Usa webkitCompassHeading)
+            if (event.webkitCompassHeading !== undefined) {
+                rawHeading = event.webkitCompassHeading;
+            } 
+            // 2. Logica per Android (Usa alpha dalla lettura assoluta)
+            else if (event.alpha !== null) {
+                // I browser standard basano alpha su Ovest/Est in modo anti-orario. 
+                // 360 - alpha lo converte nella lettura standard della bussola in senso orario.
+                rawHeading = 360 - event.alpha;
             }
 
-            // 2. Geolocalizzazione
-            navigator.geolocation.getCurrentPosition((pos) => {
-                const lat = pos.coords.latitude;
-                const lon = pos.coords.longitude;
-                
-                updatePositions(lat, lon);
-                // Aggiorna ogni minuto
-                setInterval(() => updatePositions(lat, lon), 60000);
-                
-                document.getElementById('overlay').style.display = 'none';
-            }, (err) => {
-                alert("Errore GPS: Consenti l'accesso alla posizione per vedere le stelle.");
-            });
-        });
+            updateDisplay();
+        }
 
-        // Calibrazione Manuale: Ruota l'intera volta celeste
-        slider.addEventListener('input', (e) => {
-            currentOffset = e.target.value;
-            vault.setAttribute('rotation', `0 ${currentOffset} 0`);
+        // Richiesta permessi e attivazione
+        btnStart.addEventListener('click', async () => {
+            // Controlla se siamo su un dispositivo iOS che richiede il permesso esplicito
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const permissionState = await DeviceOrientationEvent.requestPermission();
+                    if (permissionState === 'granted') {
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        btnStart.style.background = "#444";
+                        btnStart.textContent = "Sensori Attivi";
+                    } else {
+                        alert("Permesso negato. Impossibile usare la bussola.");
+                    }
+                } catch (error) {
+                    alert("Errore nell'attivazione dei sensori.");
+                }
+            } else {
+                // Per Android o browser che non richiedono permesso esplicito
+                // Proviamo prima l'evento 'deviceorientationabsolute' (Android)
+                if ('ondeviceorientationabsolute' in window) {
+                    window.addEventListener('deviceorientationabsolute', handleOrientation);
+                } else {
+                    window.addEventListener('deviceorientation', handleOrientation);
+                }
+                btnStart.style.background = "#444";
+                btnStart.textContent = "Sensori Attivi";
+            }
         });
-
     </script>
 </body>
 </html>
