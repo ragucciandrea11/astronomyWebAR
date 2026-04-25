@@ -1,118 +1,60 @@
 <!DOCTYPE html>
-<html lang="it">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Celestial AR - Final</title>
-    <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <meta charset="utf-8">
+    <title>DEBUG CELESTIAL</title>
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; }
-        /* Mirino centrale per aiutarti a puntare */
-        #crosshair {
-            position: absolute; top: 50%; left: 50%; width: 20px; height: 20px;
-            border: 2px solid #00ff88; border-radius: 50%;
-            transform: translate(-50%, -50%); z-index: 100; pointer-events: none;
-        }
-        #ui-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; color: white; z-index: 10000;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-        }
-        #btn-go { padding: 20px 40px; font-size: 20px; background: #00ff88; border: none; border-radius: 50px; font-weight: bold; cursor: pointer; }
-        #bottom-bar {
-            position: absolute; bottom: 20px; width: 100%; text-align: center; z-index: 1000;
-            background: rgba(0,0,0,0.6); padding: 10px 0; color: white; display: none;
-        }
-        .debug { position: absolute; top: 10px; left: 10px; color: #00ff88; font-size: 10px; z-index: 1000; }
+        #splash { position: fixed; top:0; left:0; width:100%; height:100%; background:black; color:white; z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+        button { padding:20px; font-size:20px; background:#0f0; border:none; border-radius:10px; }
     </style>
 </head>
-<body>
+<body style="margin: 0px; overflow: hidden;">
 
-    <div id="ui-overlay">
-        <h1>CELESTIAL AR</h1>
-        <p>Punta il cielo e calibra</p>
-        <button id="btn-go">APRI VISORE</button>
+    <div id="splash">
+        <h1>RESET TOTALE</h1>
+        <button onclick="start()">CLICCA QUI</button>
     </div>
 
-    <div id="crosshair"></div>
-    <div class="debug" id="console">Sistema pronto.</div>
-
-    <div id="bottom-bar">
-        <input type="range" id="calibrator" min="0" max="360" value="0" style="width: 80%"><br>
-        <span>Trascina per allineare i nomi alle stelle</span>
-    </div>
-
-    <a-scene 
-        embedded 
-        arjs="sourceType: webcam; debugUIEnabled: false; uiEnabled: false;" 
-        vr-mode-ui="enabled: false" 
-        loading-screen="enabled: false">
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
         
-        <a-camera id="camera" look-controls="touchEnabled: false;"></a-camera>
-
-        <a-entity id="sky-vault">
-            <a-sphere id="moon-obj" radius="2" color="#FFF" material="emissive: #FFF; emissiveIntensity: 1"></a-sphere>
-            <a-text id="moon-label" value="LUNA" align="center" scale="15 15 15" position="0 5 0"></a-text>
-
-            <a-sphere position="0 0 -20" radius="0.5" color="red"></a-sphere>
-            <a-text value="TEST: NORD" position="0 2 -20" align="center" scale="10 10 10" color="red"></a-text>
+        <a-sphere position="0 0 -10" radius="2" color="red"></a-sphere>
+        
+        <a-camera id="cam" look-controls></a-camera>
+        
+        <a-entity id="mondo">
+            <a-sphere id="luna" radius="1" color="white" position="0 10 -20"></a-sphere>
+            <a-text value="LUNA" position="0 12 -20" align="center" scale="10 10 10"></a-text>
         </a-entity>
-
     </a-scene>
 
     <script>
-        const overlay = document.getElementById('ui-overlay');
-        const bar = document.getElementById('bottom-bar');
-        const vault = document.getElementById('sky-vault');
-        const debug = document.getElementById('console');
-
-        function updateSky(lat, lon) {
-            const date = new Date();
-            const obs = new Astronomy.Observer(lat, lon, 0);
+        function start() {
+            alert("1. Avvio sensori...");
             
-            // Calcolo Luna
-            const equ = Astronomy.Equator('Moon', date, obs, true, true);
-            const hor = Astronomy.Horizon(date, obs, equ.ra, equ.dec, 'normal');
-            
-            const altRad = hor.altitude * (Math.PI/180);
-            const azRad = hor.azimuth * (Math.PI/180);
-            const d = 300;
-            
-            const x = d * Math.cos(altRad) * Math.sin(azRad);
-            const y = d * Math.sin(altRad);
-            const z = d * Math.cos(altRad) * -Math.cos(azRad);
+            // Nascondi overlay
+            document.getElementById('splash').style.display = 'none';
 
-            document.getElementById('moon-obj').setAttribute('position', `${x} ${y} ${z}`);
-            document.getElementById('moon-label').setAttribute('position', `${x} ${y+10} ${z}`);
-            
-            debug.innerHTML = `Punto: ${lat.toFixed(2)}, ${lon.toFixed(2)} | Luna Alt: ${hor.altitude.toFixed(1)}°`;
-        }
-
-        document.getElementById('btn-go').onclick = async () => {
-            // Nascondi TUTTO subito
-            overlay.style.display = 'none';
-            bar.style.display = 'block';
-
-            // Permessi Sensori
+            // Permessi iOS/Android
             if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                try { await DeviceOrientationEvent.requestPermission(); } catch(e) {}
+                DeviceOrientationEvent.requestPermission().then(response => {
+                    alert("2. Permesso orientamento: " + response);
+                }).catch(err => alert("Errore sensori: " + err));
             }
 
-            // Avvio con Roma (veloce) e poi aggiorna col GPS vero
-            updateSky(41.89, 12.49);
-
-            navigator.geolocation.getCurrentPosition(
-                (p) => updateSky(p.coords.latitude, p.coords.longitude),
-                (e) => debug.innerHTML = "GPS Offline - Uso Default",
-                { timeout: 3000 }
-            );
-        };
-
-        document.getElementById('calibrator').oninput = (e) => {
-            vault.setAttribute('rotation', `0 ${e.target.value} 0`);
-        };
+            // Test Astronomico Veloce (Default Roma)
+            try {
+                const date = new Date();
+                const obs = new Astronomy.Observer(41.9, 12.5, 0);
+                const equ = Astronomy.Equator('Moon', date, obs, true, true);
+                const hor = Astronomy.Horizon(date, obs, equ.ra, equ.dec, 'normal');
+                alert("3. Astronomia OK! Luna Altezza: " + hor.altitude.toFixed(1));
+            } catch(e) {
+                alert("Errore Astronomia: " + e);
+            }
+        }
     </script>
 </body>
 </html>
