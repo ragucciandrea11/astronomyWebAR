@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WebAR Celestial Simulator - Pro</title>
+    <title>WebAR Celestial Simulator - Finale</title>
     
     <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
@@ -24,7 +24,6 @@
             border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-top: 30px;
         }
 
-        /* Il nuovo cruscotto HUD (Head-Up Display) */
         #hud {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
             width: 90%; background: rgba(0, 0, 0, 0.8); border: 1px solid #00ff88;
@@ -45,11 +44,11 @@
 
     <div id="overlay">
         <h2>ALLINEAMENTO NASA</h2>
-        <p>Per sincronizzare la volta celeste, dobbiamo sbloccare i sensori hardware del tuo dispositivo.</p>
+        <p>Cielo calcolando... Offset impostato a +69° per il tuo dispositivo.</p>
         <button id="start-btn">SBLOCCA SENSORI E INIZIA</button>
     </div>
 
-    <div id="top-info">GPS In attesa...</div>
+    <div id="top-info">Attendere coordinate GPS...</div>
 
     <div id="hud" style="display: none;">
         <div class="hud-row">
@@ -57,24 +56,33 @@
             <span id="raw-heading" class="hud-value">--°</span>
         </div>
         <div class="hud-row">
-            <span>Offset Manuale:</span>
-            <span id="offset-val" class="hud-value" style="color: #ffcc00;">0°</span>
+            <span>Compensazione:</span>
+            <span id="offset-val" class="hud-value" style="color: #ffcc00;">+69°</span>
         </div>
-        <input type="range" id="azimuth-slider" min="-180" max="180" value="0">
+        <input type="range" id="azimuth-slider" min="-180" max="180" value="69">
     </div>
 
     <a-scene vr-mode-ui="enabled: false" arjs="sourceType: webcam; debugUIEnabled: false;" renderer="logarithmicDepthBuffer: true;">
         <a-camera id="main-camera" position="0 1.6 0" look-controls="magicWindowTrackingEnabled: true; touchEnabled: false;"></a-camera>
 
-        <a-entity id="celestial-vault">
-            <a-sphere id="sun" radius="10" color="#FFD700"></a-sphere>
-            <a-text value="SOLE" id="sun-label" align="center" scale="30 30 30" color="#FFD700" position="0 15 0"></a-text>
+        <a-entity id="celestial-vault" rotation="0 69 0">
+            <a-sphere id="sun" radius="8" color="#FFD700" material="emissive: #FFD700"></a-sphere>
+            <a-text value="SOLE" id="sun-label" align="center" scale="25 25 25" color="#FFD700"></a-text>
 
-            <a-sphere id="moon" radius="8" color="#FFFFFF"></a-sphere>
-            <a-text value="LUNA" id="moon-label" align="center" scale="25 25 25" color="#FFFFFF" position="0 15 0"></a-text>
+            <a-sphere id="moon" radius="6" color="#FFFFFF"></a-sphere>
+            <a-text value="LUNA" id="moon-label" align="center" scale="20 20 20" color="#FFFFFF"></a-text>
 
-            <a-sphere id="mars" radius="4" color="#FF4500"></a-sphere>
-            <a-text value="MARTE" id="mars-label" align="center" scale="20 20 20" color="#FF4500" position="0 15 0"></a-text>
+            <a-sphere id="mars" radius="3" color="#FF4500"></a-sphere>
+            <a-text value="MARTE" id="mars-label" align="center" scale="15 15 15" color="#FF4500"></a-text>
+
+            <a-sphere id="venus" radius="4" color="#FFFFDD"></a-sphere>
+            <a-text value="VENERE" id="venus-label" align="center" scale="15 15 15" color="#FFFFDD"></a-text>
+
+            <a-sphere id="jupiter" radius="5" color="#FFAA88"></a-sphere>
+            <a-text value="GIOVE" id="jupiter-label" align="center" scale="15 15 15" color="#FFAA88"></a-text>
+
+            <a-sphere id="saturn" radius="4" color="#F4E4BA"></a-sphere>
+            <a-text value="SATURNO" id="saturn-label" align="center" scale="15 15 15" color="#F4E4BA"></a-text>
         </a-entity>
     </a-scene>
 
@@ -85,10 +93,10 @@
         const rawHeadingEl = document.getElementById('raw-heading');
         const offsetValEl = document.getElementById('offset-val');
 
-        let currentOffset = 0;
+        // Impostiamo il tuo offset di fabbrica
+        let currentOffset = 69;
 
-        // Geometria Sferica -> Cartesiana
-        function getVector(alt, az, dist = 600) {
+        function getVector(alt, az, dist = 500) {
             const altRad = alt * (Math.PI / 180);
             const azRad = az * (Math.PI / 180);
             return {
@@ -98,12 +106,13 @@
             };
         }
 
-        // Calcolo e Posizionamento Corpi Celesti
         function updatePositions(lat, lon) {
             const date = new Date();
             const observer = new Astronomy.Observer(lat, lon, 0);
             
-            const bodies = ['Sun', 'Moon', 'Mars'];
+            // Il catalogo dei pianeti che calcoleremo
+            const bodies = ['Sun', 'Moon', 'Mars', 'Venus', 'Jupiter', 'Saturn'];
+            
             bodies.forEach(name => {
                 const equ = Astronomy.Equator(name, date, observer, true, true);
                 const hor = Astronomy.Horizon(date, observer, equ.ra, equ.dec, 'normal');
@@ -113,28 +122,27 @@
                 const label = document.getElementById(name.toLowerCase() + '-label');
                 
                 if(el) el.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
-                // Mettiamo l'etichetta esattamente sopra il pianeta
-                if(label) label.setAttribute('position', `${pos.x} ${pos.y + 20} ${pos.z}`);
+                // Etichetta sopra il pianeta e girata verso l'utente
+                if(label) {
+                    label.setAttribute('position', `${pos.x} ${pos.y + 15} ${pos.z}`);
+                    label.setAttribute('look-at', '#main-camera');
+                }
             });
 
-            topInfo.innerHTML = `Lat: ${lat.toFixed(2)} Lon: ${lon.toFixed(2)}<br>Ora: ${date.toLocaleTimeString()}`;
+            topInfo.innerHTML = `Lat: ${lat.toFixed(2)} Lon: ${lon.toFixed(2)} | Ora: ${date.toLocaleTimeString()}`;
         }
 
-        // Lettura della Bussola in Tempo Reale
         function handleOrientation(event) {
             let heading = 0;
             if (event.webkitCompassHeading !== undefined) {
-                heading = event.webkitCompassHeading; // iOS
+                heading = event.webkitCompassHeading;
             } else if (event.alpha !== null) {
-                heading = 360 - event.alpha; // Android
+                heading = 360 - event.alpha;
             }
             rawHeadingEl.textContent = Math.round(heading) + "°";
         }
 
-        // Gestione Avvio e Permessi
         document.getElementById('start-btn').addEventListener('click', async () => {
-            
-            // Sblocco sensori iOS
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 try {
                     const permission = await DeviceOrientationEvent.requestPermission();
@@ -143,7 +151,6 @@
                     }
                 } catch (e) { alert("Errore sensori."); }
             } else {
-                // Sblocco sensori Android
                 if ('ondeviceorientationabsolute' in window) {
                     window.addEventListener('deviceorientationabsolute', handleOrientation);
                 } else {
@@ -151,26 +158,23 @@
                 }
             }
 
-            // GPS
             navigator.geolocation.getCurrentPosition((pos) => {
                 updatePositions(pos.coords.latitude, pos.coords.longitude);
+                // Ricalcola ogni 60 secondi
+                setInterval(() => updatePositions(pos.coords.latitude, pos.coords.longitude), 60000);
                 
-                // Nascondi overlay e mostra HUD
                 document.getElementById('overlay').style.display = 'none';
                 document.getElementById('hud').style.display = 'block';
             }, (err) => {
-                alert("Devi attivare il GPS per calcolare le stelle.");
+                alert("Attiva il GPS per l'allineamento stellare.");
             });
         });
 
-        // Gestione Slider Offset
         slider.addEventListener('input', (e) => {
             currentOffset = parseInt(e.target.value);
             offsetValEl.textContent = currentOffset > 0 ? `+${currentOffset}°` : `${currentOffset}°`;
-            // Ruota l'intera volta celeste per farla combaciare con la realtà
             vault.setAttribute('rotation', `0 ${currentOffset} 0`);
         });
-
     </script>
 </body>
 </html>
